@@ -1,0 +1,22 @@
+project:
+  name: databricks_batch_analytics_spark_optimization
+  environment: dev
+
+paths:
+  raw_data: data/raw
+  bronze: data/bronze
+  silver: data/silver
+  gold: data/gold
+
+data_generation:
+  products: 50000
+  customers: 100000
+  stores: 500
+  orders: 100000
+  max_items_per_order: 5
+
+skew:
+  hot_category: electronics
+  hot_category_ratio: 0.40
+  hot_region: Ontario
+  hot_region_ratio: 0.35
