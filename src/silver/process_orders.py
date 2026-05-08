@@ -1,0 +1,76 @@
+import argparse
+
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import current_timestamp, trim, lower, col
+from src.utils.config_loader import load_config
+from src.utils.spark_session import create_spark_session
+
+
+def read_bronze_delta(spark, input_path: str) -> DataFrame:
+    return spark.read.format("delta").load(input_path)
+
+
+def transform_orders(df: DataFrame) -> DataFrame:
+    return (
+        df
+        .dropDuplicates(["order_id"])
+        .filter(col("order_id").isNotNull())
+        .filter(col("customer_id").isNotNull())
+        .filter(col("store_id").isNotNull())
+        .withColumn("order_status", lower(trim(col("order_status"))))
+        .withColumn("payment_method", lower(trim(col("payment_method"))))
+        .filter(col("total_amount") > 0)
+        .filter(col("item_count") > 0)
+        .withColumn("silver_processing_timestamp", current_timestamp())
+    )
+
+def write_silver_delta(df: DataFrame, output_path: str) -> None:
+    (
+        df.write
+        .format("delta")
+        .mode("overwrite")
+        .save(output_path)
+    )
+
+
+def process_orders(
+    spark,
+    dataset_name: str,
+    bronze_base_path: str,
+    silver_base_path: str,
+) -> None:
+    input_path = f"{bronze_base_path}/{dataset_name}"
+    output_path = f"{silver_base_path}/{dataset_name}"
+
+    print(f"Reading bronze dataset: {input_path}")
+
+    bronze_df = read_bronze_delta(spark, input_path)
+    silver_df = transform_orders(bronze_df)
+
+    print(f"Writing Silver Delta dataset: {output_path}")
+    write_silver_delta(silver_df, output_path)
+
+    print(f"Completed Silver ingestion for: {dataset_name}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config-path", default="configs/dev.yaml")
+
+    args = parser.parse_args()
+
+    config = load_config(args.config_path)
+
+    bronze_base_path = config["paths"]["bronze"]
+    silver_base_path = config["paths"]["silver"]
+
+    spark = create_spark_session("SilverOrdersProcessing")
+
+    process_orders(
+        spark=spark,
+        dataset_name="orders",
+        bronze_base_path=bronze_base_path,
+        silver_base_path=silver_base_path,
+    )
+
+    spark.stop()
