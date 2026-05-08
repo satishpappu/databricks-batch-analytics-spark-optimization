@@ -1,0 +1,17 @@
+venv/
+.venv/
+env/
+
+__pycache__/
+*.pyc
+
+data/
+*.csv
+*.parquet
+*.crc
+
+spark-warehouse/
+_metastore/
+
+.DS_Store
+.ipynb_checkpoints/
